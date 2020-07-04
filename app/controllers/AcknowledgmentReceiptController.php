@@ -1,0 +1,193 @@
+<?php
+
+namespace app\controllers;
+
+use Yii;
+use app\models\AcknowledgmentReceipt;
+use app\models\Profile;
+
+use app\models\search\AcknowledgmentReceiptSearch;
+use app\models\search\PurchaseOrderSearch; 
+
+use yii\web\Controller;
+use yii\web\NotFoundHttpException;
+use yii\web\ForbiddenHttpException;
+use yii\filters\VerbFilter;
+
+/**
+ * AcknowledgmentReceiptController implements the CRUD actions for AcknowledgmentReceipt model.
+ */
+class AcknowledgmentReceiptController extends Controller
+{
+    /**
+     * {@inheritdoc}
+     */
+        
+    public function behaviors()
+    {
+        return Yii::$app->permission->behaviors();
+    }
+
+    /**
+     * Lists all AcknowledgmentReceipt models.
+     * @return mixed
+     */
+    public function actionIndex()
+    {
+        $searchModel = new AcknowledgmentReceiptSearch();
+        $dataProvider = $searchModel->search(Yii::$app->request->queryParams);
+
+        return $this->render('index', [
+            'searchModel' => $searchModel,
+            'dataProvider' => $dataProvider,
+        ]);
+    }
+
+    /**
+     * Displays a single AcknowledgmentReceipt model.
+     * @param integer $id
+     * @return mixed
+     * @throws NotFoundHttpException if the model cannot be found
+     */
+    public function actionView($id)
+    {
+        $model = $this->findModel($id);
+
+        return $this->render('view', [
+            'model' => $model,
+        ]);
+    }
+
+    /**
+     * Creates a new AcknowledgmentReceipt model.
+     * If creation is successful, the browser will be redirected to the 'view' page.
+     * @return mixed
+     */
+    public function actionCreate()
+    {
+        $model = new AcknowledgmentReceipt();
+
+        if ($model->load(Yii::$app->request->post()) && $model->save()) {
+            Yii::$app->kanity->notify($model, [
+                'message' => 'New Acknowledge Receipt was created.',
+                'user_id' => $model->quotation->user_id,
+            ]);
+
+            Yii::$app->session->setFlash('success', 'Successfully Created');
+            return $this->redirect(['view', 'id' => $model->id]);
+        }
+
+        return $this->render('create', [
+            'model' => $model,
+        ]);
+    }
+
+    /**
+     * Updates an existing AcknowledgmentReceipt model.
+     * If update is successful, the browser will be redirected to the 'view' page.
+     * @param integer $id
+     * @return mixed
+     * @throws NotFoundHttpException if the model cannot be found
+     */
+    public function actionUpdate($id)
+    {
+        $model = $this->findModel($id);
+
+        if ($model->load(Yii::$app->request->post()) && $model->save()) {
+
+            Yii::$app->session->setFlash('success', 'Successfully Updated');
+            
+            return $this->redirect(['view', 'id' => $model->id]);
+        }
+
+        return $this->render('update', [
+            'model' => $model,
+        ]);
+    }
+
+    /**
+     * Deletes an existing AcknowledgmentReceipt model.
+     * If deletion is successful, the browser will be redirected to the 'index' page.
+     * @param integer $id
+     * @return mixed
+     * @throws NotFoundHttpException if the model cannot be found
+     */
+    public function actionDelete($id)
+    {
+        $model = $this->findModel($id);
+
+        $model->status = 0;
+
+        if($model->save()) {
+            Yii::$app->session->setFlash('success', 'Successfully Deleted');
+        }
+        else {
+            Yii::$app->session->setFlash('danger', json_encode($model->errors));
+        }
+
+        return $this->redirect(['index']);
+    }
+
+    /**
+     * Finds the AcknowledgmentReceipt model based on its primary key value.
+     * If the model is not found, a 404 HTTP exception will be thrown.
+     * @param integer $id
+     * @return AcknowledgmentReceipt the loaded model
+     * @throws NotFoundHttpException if the model cannot be found
+     */
+    protected function findModel($id)
+    {
+        $model = AcknowledgmentReceiptSearch::one($id);
+        $action = Yii::$app->permission->findAction();
+
+        if ($model) {
+
+            if (isset($model->$action) && !$model->$action) {
+                throw new ForbiddenHttpException('The requested page cannot process ' . ucfirst($this->action->id) . ' action');
+            }
+            
+            return $model;
+        }
+    }
+
+    public function actionGetPurchaseOrder($id)
+    {
+        if ($id) {
+            $model = PurchaseOrderSearch::one($id);
+            $profile = Profile::find()
+                ->where(['user_id' => $model->quotation->user_id])
+                ->andWhere(['status' => 1])
+                ->one();
+
+            return json_encode([
+                'quotation_details' => $this->renderPartial('/quotation/_detail', 
+                    ['model' => $model->quotation]),
+                'po_details' => $this->renderPartial('/purchase-order/_detail', 
+                    ['model' => $model]),
+                'profile' => $profile
+            ]);
+        }
+    }
+
+
+    public function actionPrintOne($id)
+    {
+        $model = $this->findModel($id);
+        $this->layout = 'default';
+        return $this->render('print_one', [
+            'model' => $model,
+        ]);
+    }
+
+    public function actionPrint($params)
+    {
+        $params = json_decode($params, true);
+        $searchModel = new AcknowledgmentReceiptSearch();
+        $dataProvider = $searchModel->search($params);
+        $this->layout = 'default';
+        return $this->render('print', [
+            'searchModel' => $searchModel,
+            'dataProvider' => $dataProvider,
+        ]);
+    }
+}
